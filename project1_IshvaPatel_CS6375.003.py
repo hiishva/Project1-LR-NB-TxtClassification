@@ -4,6 +4,8 @@ import sys
 import os
 import re
 
+from sklearn import metrics as met
+
 reg = re.compile('[@_!#$%^&*()<>?/\|}{~:]')
 
 ## File paths 
@@ -19,95 +21,221 @@ hamTrainDir= "/".join([cwd, HamTrainPath])
 spamTrainDir = "/".join([cwd, SpamTrainPath])
 hamTestDir = "/".join([cwd, HamTestPath])
 spamTestDir ="/".join([cwd, SpamTestPath])
+
 trainDirs = [hamTrainDir, spamTrainDir]
 testDirs = [hamTestDir, spamTestDir]
 
-def CreateVocab(directories):
-    vocab = []
-    for dir in directories:
-        with os.scandir(dir) as dir:
-            for file in dir:
-                try:
-                    f = open(file,'r', encoding='latin-1')
-                    lines = f.readlines()
-                    for line in lines:
-                        words = line.strip().upper().split(" ")
-                        for word in words:
-                            if (reg.search(word) == None):
-                                if(word not in vocab):
-                                    vocab.append(word)
-                    f.close()
-                except UnicodeDecodeError as err:
-                    print('Error: {}'.format(err))
-    return(vocab)
+# def CreateVocab(directories):
+#     totalVocab = []
+#     hamVocab = []
+#     spamVocab = []
+#     for dir in directories:
+#         with os.scandir(dir) as dir:
+#             for file in dir:
+#                 try:
+#                     f = open(file,'r', encoding='latin-1')
+#                     lines = f.readlines()
+#                     for line in lines:
+#                         words = line.strip().upper().split(" ")
+#                         for word in words:
+#                             if (reg.search(word) == None and word not in totalVocab):
+#                                 totalVocab.append(word)
+#                             if (reg.search(word) == None and dir.split('/')[-1] == 'ham' and word not in hamVocab):
+#                                 hamVocab.append(word)
+#                             elif (reg.search(word) == None and dir.split('/')[-1] == 'spam' and word not in spamVocab):
+#                                 spamVocab.append(word)
+#                     f.close()
+#                 except UnicodeDecodeError as err:
+#                     print('Error: {}'.format(err))
+#     return(totalVocab, hamVocab, spamVocab)
 
 
 ## CREATING THE DATASETS
-def CreateBagOfWords(directories, vocab):
+def CreateBagOfWords(directories):
     #Bag of Words model dataset
-    dataset = np.zeros((len(vocab),1))
-    fileSpamOrHam = 0
-    spamOrHam = []
-    for dir in directories:
-        if dir.split('/')[-1] == 'ham':
-            fileSpamOrHam = 1
-        else:
-            fileSpamOrHam = 0
-        with os.scandir(dir) as dir:
+    spamDict = {}
+    hamDict = {}
+    totalDict = {}
+    hamDocs = 0
+    spamDocs = 0
+
+    for dirs in directories:
+        with os.scandir(dirs) as dir:
             for file in dir:
-                fileBag = np.zeros((len(vocab),1))
+                if dirs.split('/')[-1] == 'ham':
+                    hamDocs += 1
+                if dirs.split('/')[-1] == 'spam':
+                    spamDocs += 1
                 try:
                     f = open(file,'r', encoding='latin-1')
                     lines = f.readlines()
                     for line in lines:
                         words = line.strip().upper().split(" ")
                         for word in words:
-                            if (reg.search(word) == None and word in vocab):
-                                idx = vocab.index(word)     # Get index from input vocab
-                                fileBag[idx] += 1           # Increment word by 1 if present in message
+                            if word in totalDict:
+                                totalDict[word] += 1
+                            else:
+                                totalDict[word] = 1
+                            if (dirs.split('/')[-1] == 'ham'):
+                                if word in hamDict:
+                                    hamDict[word] += 1
+                                else:
+                                    hamDict[word] = 1
+                            elif (dirs.split('/')[-1] == 'spam'):
+                                if word in spamDict:
+                                    spamDict[word] += 1
+                                else:
+                                    spamDict[word] = 1
                     f.close()
-                    dataset = np.append(dataset, fileBag, axis=1)
-                    spamOrHam.append(fileSpamOrHam)
                 except UnicodeDecodeError as err:
                     print('Error: {}'.format(err))
-    # print(dataset.shape)
-    return(dataset, spamOrHam)
+    return (totalDict, hamDict, spamDict, hamDocs, spamDocs)
 
-def CreateBernoulli(directories, vocab):
-    #Bag of Words model dataset
-    dataset = np.zeros((len(vocab),1))
-    fileSpamOrHam = 0
-    spamOrHam = []
-    for dir in directories:
-        if dir.split('/')[-1] == 'ham':
-            fileSpamOrHam = 1
-        else:
-            fileSpamOrHam = 0
-        with os.scandir(dir) as dir:
+def CreateBernoulli(directories):
+    spamDict = {}
+    hamDict = {}
+    totalDict = {}
+    hamDocs = 0
+    spamDocs = 0
+    
+    for dirs in directories:
+        with os.scandir(dirs) as dir:
             for file in dir:
-                fileBag = np.zeros((len(vocab),1))
+                if dirs.split('/')[-1] == 'ham':
+                    hamDocs += 1
+                if dirs.split('/')[-1] == 'spam':
+                    spamDocs += 1
                 try:
                     f = open(file,'r', encoding='latin-1')
                     lines = f.readlines()
                     for line in lines:
                         words = line.strip().upper().split(" ")
                         for word in words:
-                            if (reg.search(word) == None and word in vocab):
-                                idx = vocab.index(word)     # Get index from input vocab
-                                fileBag[idx] = 1            # Set word to 1 if present in message
+                            totalDict[word] = 1
+                            if (dirs.split('/')[-1] == 'ham'):
+                                hamDict[word] = 1
+                            elif (dirs.split('/')[-1] == 'spam'):
+                                spamDict[word] = 1
                     f.close()
-                    dataset = np.append(dataset, fileBag, axis=1)
-                    spamOrHam.append(fileSpamOrHam)
                 except UnicodeDecodeError as err:
                     print('Error: {}'.format(err))
-    return(dataset, spamOrHam)
+    return (totalDict, hamDict, spamDict, hamDocs, spamDocs)
+
+# Multinomial NB
+def TrainMultinomialNB(totalDict, hamDict, spamDict, hamDocs, spamDocs):
+    prior = []
+    cndtlProb = {}
+    cndtlProb['spam'] = {}
+    cndtlProb['ham'] = {}
+    cndtlProbNoWord = {}
+    cndtlProbNoWord['spam'] = {}
+    cndtlProbNoWord['ham'] = {}
 
 
-train_vocab = CreateVocab(trainDirs)
-print("Created Vocabulary...")
-XTrainBOW, yTrainBOW = CreateBagOfWords(trainDirs, train_vocab)
-XTrainBernoulli, yTrainBernoulli = CreateBernoulli(trainDirs, train_vocab)
-print("Created training sets...")
-print("training dataset shapes:\n\tBag of words: {}\n\tBernoulli: {}".format(XTrainBOW.shape, XTrainBernoulli.shape))
-print(XTrainBOW)
-print(yTrainBOW)
+    #PRIORS
+    prior.append(log(hamDocs/(hamDocs + spamDocs)))
+    prior.append(log(spamDocs/(hamDocs + spamDocs)))
+
+    #CONDITIONAL PROBS
+    numSpamWords = len(hamDict.keys())
+    numHamWords = len(spamDict.keys())
+    numWords = len(totalDict.keys())
+    
+    for word in spamDict.keys():
+        cndtlProb['spam'][word] = log((spamDict[word]+1) / (numSpamWords + numWords))
+
+    for word in hamDict.keys():
+        cndtlProb['ham'][word] = log((hamDict[word] + 1) / (numHamWords + numWords))
+    
+
+    cndtlProbNoWord['ham'] = log(1/(numHamWords + numWords))
+    cndtlProbNoWord['spam'] = log(1/(numSpamWords + numWords))
+
+    return prior, cndtlProb, cndtlProbNoWord
+
+def TrainDiscreteNaiveBayes(totalDict, hamDict, spamDict, hamDocs, spamDocs):
+    prior = []
+    cndtlProb = {}
+    cndtlProb['spam'] = {}
+    cndtlProb['ham'] = {}
+    cndtlProbNoWord = {}
+    cndtlProbNoWord['spam'] = {}
+    cndtlProbNoWord['ham'] = {}
+
+    #PRIORS
+    prior.append(log(hamDocs/(hamDocs + spamDocs)))
+    prior.append(log(spamDocs/(hamDocs + spamDocs)))
+
+    #CONDITIONAL PROBS
+    numSpamWords = len(hamDict.keys())
+    numHamWords = len(spamDict.keys())
+    numWords = len(totalDict.keys())
+
+    # For words in training set
+    for word in spamDict.keys():
+        cndtlProb['spam'][word] = log((spamDict[word] + 1)/(spamDocs + 2))
+    
+    for word in hamDict.keys():
+        cndtlProb['ham'][word] = log((hamDict[word] + 1)/(hamDocs + 2))
+    
+    # For words not in training set:
+    cndtlProbNoWord['spam'] = log((1/(spamDocs + 2)))
+    cndtlProbNoWord['ham'] = log((1/(hamDocs + 2)))
+    
+    return prior, cndtlProb, cndtlProbNoWord
+
+def TestMultinomialNB(directories, prior, cndtlProb, cndtlProbNoWord):
+    y_test = []
+    y_true = []
+    for dirs in directories:
+        with os.scandir(dirs) as dir:
+            for file in dir:
+                # Log true value
+                if dirs.split('/')[-1] == 'ham':
+                    y_true.append(1)
+                if dirs.split('/')[-1] == 'spam':
+                    y_true.append(0)
+
+                # Calculate test value
+                pHam = prior[0]
+                pSpam = prior[1]
+                
+                try:
+                    f = open(file,'r', encoding='latin-1')
+                    lines = f.readlines()
+                    for line in lines:
+                        words = line.strip().upper().split(" ")
+                        for word in words:
+                            try:
+                                pHam += cndtlProb['ham'][word]
+                                pSpam += cndtlProb['spam'][word]
+                            except KeyError as e:
+                                pHam += cndtlProbNoWord['ham']
+                                pSpam += cndtlProbNoWord['spam']
+                    f.close()
+                    if pHam > pSpam:
+                        y_test.append(1)
+                    else:
+                        y_test.append(0)
+                except UnicodeDecodeError as err:
+                    print('Error: {}'.format(err))
+
+    return y_test, y_true
+
+def TestDiscreteNB(testDirs):
+    
+    return
+
+# Create dataset models
+totalDictBOW, hamDictBOW, spamDictBOW, hamDocsBOW, spamDocsBOW = CreateBagOfWords(trainDirs)
+totalDictBER, hamDictBER, spamDictBER, hamDocsBER, spamDocsBER = CreateBernoulli(trainDirs)
+
+# Train and Test Naive Bayes
+mn_prior, mn_cndtlProb, mn_cndtlProbNoWord = TrainMultinomialNB(totalDictBOW, hamDictBOW, spamDictBOW, hamDocsBOW, spamDocsBOW)
+disc_prior, disc_cndtlProb, disc_cndtlProbNoWord = TrainDiscreteNaiveBayes(totalDictBER, hamDictBER, spamDictBER, hamDocsBER, spamDocsBER)
+
+mn_ytest, mn_ytrue = TestMultinomialNB(testDirs, mn_prior, mn_cndtlProb, mn_cndtlProbNoWord)
+print(mn_ytrue)
+
+mn_precision, mn_recall, mn_fscore, mn_support = met.precision_recall_fscore_support(mn_ytrue, mn_ytest)
+print('Multinomial Naive Bayes:\n\tPrecision:\t{}\n\tRecall:\t\t{}\n\tF1-score:\t{}'.format(mn_precision, mn_recall, mn_fscore))
