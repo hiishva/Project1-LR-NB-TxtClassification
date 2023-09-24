@@ -163,8 +163,8 @@ def TrainDiscreteNaiveBayes(totalDict, hamDict, spamDict, hamDocs, spamDocs):
     cndtlProbNoWord['ham'] = {}
 
     #PRIORS
-    prior.append(log(hamDocs/(hamDocs + spamDocs)))
-    prior.append(log(spamDocs/(hamDocs + spamDocs)))
+    prior.append(log(hamDocs/(float(hamDocs + spamDocs))))
+    prior.append(log(spamDocs/(float(hamDocs + spamDocs))))
 
     #CONDITIONAL PROBS
     numSpamWords = len(hamDict.keys())
@@ -173,14 +173,14 @@ def TrainDiscreteNaiveBayes(totalDict, hamDict, spamDict, hamDocs, spamDocs):
 
     # For words in training set
     for word in spamDict.keys():
-        cndtlProb['spam'][word] = log((spamDict[word] + 1)/(spamDocs + 2))
+        cndtlProb['spam'][word] = log((1 + spamDict[word])/(float(spamDocs + 2)))
     
     for word in hamDict.keys():
-        cndtlProb['ham'][word] = log((hamDict[word] + 1)/(hamDocs + 2))
+        cndtlProb['ham'][word] = log((1 + hamDict[word])/(float(hamDocs + 2)))
     
     # For words not in training set:
-    cndtlProbNoWord['spam'] = log((1/(spamDocs + 2)))
-    cndtlProbNoWord['ham'] = log((1/(hamDocs + 2)))
+    cndtlProbNoWord['spam'] = log((1/(float(spamDocs + 2))))
+    cndtlProbNoWord['ham'] = log((1/(float(hamDocs + 2))))
     
     return prior, cndtlProb, cndtlProbNoWord
 
@@ -213,7 +213,7 @@ def TestMultinomialNB(directories, prior, cndtlProb, cndtlProbNoWord):
                                 pHam += cndtlProbNoWord['ham']
                                 pSpam += cndtlProbNoWord['spam']
                     f.close()
-                    if pHam > pSpam:
+                    if pHam < pSpam:
                         y_test.append(1)
                     else:
                         y_test.append(0)
@@ -222,9 +222,49 @@ def TestMultinomialNB(directories, prior, cndtlProb, cndtlProbNoWord):
 
     return y_test, y_true
 
-def TestDiscreteNB(testDirs):
-    
-    return
+def TestDiscreteNB(directories, prior, cndtlProb, cndtlProbNoWord):
+    y_test = []
+    y_true = []
+    # score={}
+    for dirs in directories:
+        with os.scandir(dirs) as dir:
+            for file in dir:
+                # Log true value
+                if dirs.split('/')[-1] == 'ham':
+                    y_true.append(1)
+                if dirs.split('/')[-1] == 'spam':
+                    y_true.append(0)
+
+                # Calculate test value
+                pHam = prior[0]
+                pSpam = prior[1]
+                
+                try:
+                    f = open(file,'r', encoding='latin-1')
+                    lines = f.readlines()
+                    for line in lines:
+                        words = line.strip().upper().split(" ")
+                        for word in words:
+                            try:
+                                pHam += cndtlProb['ham'][word]
+                                pSpam += cndtlProb['spam'][word]
+                            except KeyError as e:
+                                pHam += cndtlProbNoWord['ham']
+                                pSpam += cndtlProbNoWord['spam']
+                    f.close()
+                    #ham is 1 spam is 0
+                    if abs(pSpam) < abs(pHam):
+                        y_test.append(1)
+                    else:
+                        y_test.append(0)
+                except UnicodeDecodeError as err:
+                    print('Error: {}'.format(err))
+    return (y_test, y_true)
+
+
+
+
+
 
 # Create dataset models
 totalDictBOW, hamDictBOW, spamDictBOW, hamDocsBOW, spamDocsBOW = CreateBagOfWords(trainDirs)
@@ -235,7 +275,13 @@ mn_prior, mn_cndtlProb, mn_cndtlProbNoWord = TrainMultinomialNB(totalDictBOW, ha
 disc_prior, disc_cndtlProb, disc_cndtlProbNoWord = TrainDiscreteNaiveBayes(totalDictBER, hamDictBER, spamDictBER, hamDocsBER, spamDocsBER)
 
 mn_ytest, mn_ytrue = TestMultinomialNB(testDirs, mn_prior, mn_cndtlProb, mn_cndtlProbNoWord)
-print(mn_ytrue)
+#print(mn_ytrue)
 
+disc_ytest, disc_ytrue = TestDiscreteNB(testDirs,disc_prior,disc_cndtlProb,disc_cndtlProbNoWord)
+print(disc_ytrue)
+print(disc_ytest)
+disc_precision,disc_recall, disc_fscore, disc_support = met.precision_recall_fscore_support(disc_ytrue,disc_ytest)
 mn_precision, mn_recall, mn_fscore, mn_support = met.precision_recall_fscore_support(mn_ytrue, mn_ytest)
 print('Multinomial Naive Bayes:\n\tPrecision:\t{}\n\tRecall:\t\t{}\n\tF1-score:\t{}'.format(mn_precision, mn_recall, mn_fscore))
+print()
+print('Discrete Naive Bayes: \n\tPrecision:\t{}\n\tRecall:\t\t{}\n\tF1-score:\t{}'.format(disc_precision,disc_recall,disc_fscore))
