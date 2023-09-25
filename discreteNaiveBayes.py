@@ -4,7 +4,7 @@ import sys
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics import precision_recall_fscore_support
 from sklearn.metrics import accuracy_score
-from helper_functions import read_data_given_folder_and_label, get_bow_and_bernoulli
+from HelperFunctions import ReadFromFolder, getBOWAndBER
 
 def trainBernoulliNB(trainData, uniqueCorpusDataFrame):
     classes = ['ham','spam']
