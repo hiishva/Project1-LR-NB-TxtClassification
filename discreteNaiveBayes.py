@@ -62,10 +62,10 @@ def testBernoulliNB(test_data, condtitionalProbMatrix, priors):
     
 if __name__ == '__main__':
     path = sys.argv[1]
-    trainData = read_data_given_folder_and_label(path, test=False)
-    testData = read_data_given_folder_and_label(path, test=True)
+    trainData = ReadFromFolder(path, test=False)
+    testData = ReadFromFolder(path, test=True)
 
-    bagOfWords, uniqueCorpusDF = get_bow_and_bernoulli(trainData, True)
+    bagOfWords, uniqueCorpusDF = getBOWAndBER(trainData, True)
 
     condtlProbMatrix, priors = trainBernoulliNB(trainData, uniqueCorpusDF)
     yDict = testBernoulliNB(testData, condtlProbMatrix, priors)
